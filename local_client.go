@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 // Variation represents a flag variation with its value and active state
@@ -44,19 +45,86 @@ type Flag struct {
 
 // LocalClient represents the Tggl API client for configuration management
 type LocalClient struct {
-	baseURL      string
-	serverAPIKey string
-	httpClient   HTTPClient
-	flags        []Flag
+	baseURL         string
+	serverAPIKey    string
+	httpClient      HTTPClient
+	flags           []Flag
+	pollingInterval int
+	stopPolling     chan struct{} // Channel to stop polling
+}
+
+// LocalClientOption represents an option for configuring the LocalClient
+type LocalClientOption func(*LocalClient)
+
+// WithPollingInterval sets the interval in milliseconds between each config refresh
+func WithPollingInterval(interval int) LocalClientOption {
+	return func(c *LocalClient) {
+		c.pollingInterval = interval
+	}
+}
+
+// StartPolling starts the polling loop if not already running
+func (c *LocalClient) StartPolling() error {
+	// If polling is already running, do nothing
+	if c.stopPolling != nil {
+		return nil
+	}
+
+	// If polling interval is not set, return error
+	if c.pollingInterval <= 0 {
+		return fmt.Errorf("polling interval must be greater than 0")
+	}
+
+	// Initialize stop channel
+	c.stopPolling = make(chan struct{})
+
+	// Start polling in background
+	go func() {
+		ticker := time.NewTicker(time.Duration(c.pollingInterval) * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-c.stopPolling:
+				return
+			case <-ticker.C:
+				if err := c.GetConfig(); err != nil {
+					fmt.Printf("Error refreshing config: %v\n", err)
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+// StopPolling stops the polling loop if running
+func (c *LocalClient) StopPolling() {
+	if c.stopPolling != nil {
+		close(c.stopPolling)
+		c.stopPolling = nil
+	}
 }
 
 // NewLocalClient creates a new instance of the client for configuration management
-func NewLocalClient(serverAPIKey string, httpClt HTTPClient) *LocalClient {
-	return &LocalClient{
+func NewLocalClient(serverAPIKey string, httpClt HTTPClient, opts ...LocalClientOption) *LocalClient {
+	client := &LocalClient{
 		baseURL:      "https://api.tggl.io",
 		serverAPIKey: serverAPIKey,
 		httpClient:   httpClt,
 	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	// Start background polling
+	if client.pollingInterval > 0 {
+		_ = client.StartPolling() // Ignore error as it can't happen here
+	}
+
+	return client
 }
 
 // GetConfig retrieves the configuration from the API

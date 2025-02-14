@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 // MockHTTPClient implements the HTTPClient interface for testing
@@ -123,5 +124,101 @@ func TestGet(t *testing.T) {
 		if result != "default-variation" {
 			t.Errorf("Expected default-variation, got %v", result)
 		}
+	})
+}
+
+func TestPolling(t *testing.T) {
+	t.Run("polling makes periodic calls and stops correctly", func(t *testing.T) {
+		// Create a channel to track API calls
+		calls := make(chan time.Time, 10)
+
+		mockClient := &MockHTTPClient{
+			DoFunc: func(req *http.Request) (*http.Response, error) {
+				// Record the time of each call
+				calls <- time.Now()
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[]`)),
+				}, nil
+			},
+		}
+
+		// Create client with 100ms polling interval
+		client := NewLocalClient("test-key", mockClient, WithPollingInterval(100))
+
+		// Wait for at least 3 calls (should take ~300ms)
+		var callTimes []time.Time
+		timeout := time.After(500 * time.Millisecond)
+
+		for i := 0; i < 3; i++ {
+			select {
+			case callTime := <-calls:
+				callTimes = append(callTimes, callTime)
+			case <-timeout:
+				t.Fatalf("Timeout waiting for API calls, got only %d calls", len(callTimes))
+			}
+		}
+
+		// Verify intervals between calls (should be ~100ms)
+		for i := 1; i < len(callTimes); i++ {
+			interval := callTimes[i].Sub(callTimes[i-1])
+			if interval < 90*time.Millisecond || interval > 110*time.Millisecond {
+				t.Errorf("Expected interval around 100ms, got %v", interval)
+			}
+		}
+
+		// Stop polling
+		client.StopPolling()
+
+		// Wait a bit to ensure no more calls are made
+		time.Sleep(200 * time.Millisecond)
+
+		// Verify no more calls were made
+		select {
+		case <-calls:
+			t.Error("Received API call after stopping polling")
+		default:
+			// No calls received, which is expected
+		}
+	})
+
+	t.Run("StartPolling with invalid interval returns error", func(t *testing.T) {
+		client := NewLocalClient("test-key", &MockHTTPClient{})
+		client.pollingInterval = 0
+
+		err := client.StartPolling()
+		if err == nil {
+			t.Error("Expected error for zero polling interval")
+		}
+	})
+
+	t.Run("StartPolling when already polling does nothing", func(t *testing.T) {
+		calls := 0
+		mockClient := &MockHTTPClient{
+			DoFunc: func(req *http.Request) (*http.Response, error) {
+				calls++
+				return &http.Response{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[]`)),
+				}, nil
+			},
+		}
+
+		client := NewLocalClient("test-key", mockClient, WithPollingInterval(100))
+
+		// Try to start polling again
+		err := client.StartPolling()
+		if err != nil {
+			t.Errorf("Expected no error when starting polling again, got %v", err)
+		}
+
+		// Wait a bit and check call count
+		time.Sleep(250 * time.Millisecond)
+		expectedCalls := 3 // Initial call + 2 polling calls
+		if calls > expectedCalls {
+			t.Errorf("Expected around %d calls, got %d (multiple polling routines?)", expectedCalls, calls)
+		}
+
+		client.StopPolling()
 	})
 }

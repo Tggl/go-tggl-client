@@ -10,7 +10,7 @@ import (
 
 func main() {
 	apiServerKey := os.Getenv("TGGL_API_KEY")
-	client := tggl.NewLocalClient(apiServerKey, &http.Client{})
+	client := tggl.NewLocalClient(apiServerKey, &http.Client{}, tggl.WithPollingInterval(3000))
 
 	if err := client.GetConfig(); err != nil {
 		log.Fatalf("Error getting config: %v", err)
