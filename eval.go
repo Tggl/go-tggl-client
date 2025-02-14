@@ -13,7 +13,7 @@ import (
 )
 
 // evalFlag evaluates a flag with a given context and returns the variation value
-func evalFlag(flag Flag, context map[string]interface{}) interface{} {
+func evalFlag(flag Flag, context Context) interface{} {
 	// Evaluate each condition
 	for _, condition := range flag.Conditions {
 		allRulesValid := true
@@ -40,7 +40,7 @@ func evalFlag(flag Flag, context map[string]interface{}) interface{} {
 	return nil
 }
 
-func evaluateRule(rule Rule, context map[string]interface{}) bool {
+func evaluateRule(rule Rule, context Context) bool {
 	// Get the context value for the rule's key
 	contextValue, exists := context[rule.Key]
 	if (!exists || contextValue == nil) && rule.Operator != "EMPTY" {

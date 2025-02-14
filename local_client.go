@@ -42,23 +42,40 @@ type Flag struct {
 	Conditions       []Condition `json:"conditions"`
 }
 
+// LocalClient represents the Tggl API client for configuration management
+type LocalClient struct {
+	baseURL      string
+	serverAPIKey string
+	httpClient   HTTPClient
+	flags        []Flag
+}
+
+// NewLocalClient creates a new instance of the client for configuration management
+func NewLocalClient(serverAPIKey string, httpClt HTTPClient) *LocalClient {
+	return &LocalClient{
+		baseURL:      "https://api.tggl.io",
+		serverAPIKey: serverAPIKey,
+		httpClient:   httpClt,
+	}
+}
+
 // GetConfig retrieves the configuration from the API
-func (c *LocalClient) GetConfig() ([]Flag, error) {
+func (c *LocalClient) GetConfig() error {
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/config", c.baseURL), nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("X-Tggl-Api-Key", c.serverAPIKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make API call: %w", err)
+		return fmt.Errorf("failed to make API call: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("invalid server API key")
+		return fmt.Errorf("invalid server API key")
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -66,68 +83,63 @@ func (c *LocalClient) GetConfig() ([]Flag, error) {
 			Error string `json:"error"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&errResp); err == nil && errResp.Error != "" {
-			return nil, fmt.Errorf("API error: %s", errResp.Error)
+			return fmt.Errorf("API error: %s", errResp.Error)
 		}
-		return nil, fmt.Errorf("API error: status code %d", resp.StatusCode)
+		return fmt.Errorf("API error: status code %d", resp.StatusCode)
 	}
 
 	var flags []Flag
 	if err := json.NewDecoder(resp.Body).Decode(&flags); err != nil {
-		return nil, fmt.Errorf("failed to deserialize response: %w", err)
+		return fmt.Errorf("failed to deserialize response: %w", err)
 	}
-
-	return flags, nil
+	c.flags = flags
+	return nil
 }
 
-func (c *LocalClient) GetString(context map[string]interface{}, slug, defaultValue string) string {
-	res, ok := getFromConfig[string](c.flags, context, slug)
+func (c *LocalClient) GetString(context Context, slug, defaultValue string) string {
+	typeVal, ok := c.Get(context, slug, defaultValue).(string)
 	if !ok {
 		return defaultValue
 	}
-	return res
+	return typeVal
 }
 
-func (c *LocalClient) GetFloat64(context map[string]interface{}, slug string, defaultValue float64) float64 {
-	res, ok := getFromConfig[float64](c.flags, context, slug)
+func (c *LocalClient) GetFloat64(context Context, slug string, defaultValue float64) float64 {
+	typeVal, ok := c.Get(context, slug, defaultValue).(float64)
 	if !ok {
 		return defaultValue
 	}
-	return res
+	return typeVal
 }
 
-func (c *LocalClient) GetInt(context map[string]interface{}, slug string, defaultValue int) int {
-	res, ok := getFromConfig[int](c.flags, context, slug)
+func (c *LocalClient) GetInt(context Context, slug string, defaultValue int) int {
+	typeVal, ok := c.Get(context, slug, defaultValue).(int)
 	if !ok {
 		return defaultValue
 	}
-	return res
+	return typeVal
 }
 
-func (c *LocalClient) GetBool(context map[string]interface{}, slug string, defaultValue bool) bool {
-	res, ok := getFromConfig[bool](c.flags, context, slug)
+func (c *LocalClient) GetBool(context Context, slug string, defaultValue bool) bool {
+	typeVal, ok := c.Get(context, slug, defaultValue).(bool)
 	if !ok {
 		return defaultValue
 	}
-	return res
+	return typeVal
 }
 
-func getFromConfig[T any](flags []Flag, context map[string]interface{}, slug string) (T, bool) {
+func (c *LocalClient) Get(context Context, slug string, defaultValue any) any {
 	var flag Flag
-	var res T
 	notFound := true
-	for i := 0; i < len(flags); i++ {
-		f := flags[i]
+	for i := 0; i < len(c.flags); i++ {
+		f := c.flags[i]
 		if f.Slug == slug {
 			flag = f
 			notFound = false
 		}
 	}
 	if notFound {
-		return res, false
+		return defaultValue
 	}
-	typeVal, ok := evalFlag(flag, context).(T)
-	if !ok {
-		return res, false
-	}
-	return typeVal, true
+	return evalFlag(flag, context)
 }

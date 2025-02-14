@@ -1,27 +1,22 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"log"
+	"net/http"
 	"os"
 
-	tggl "github.com/tggl/go-tggl-client"
+	"github.com/tggl/go-tggl-client"
 )
 
 func main() {
 	apiServerKey := os.Getenv("TGGL_API_KEY")
-	client := tggl.NewLocalClient(apiServerKey)
+	client := tggl.NewLocalClient(apiServerKey, &http.Client{})
 
-	config, err := client.GetConfig()
-	if err != nil {
+	if err := client.GetConfig(); err != nil {
 		log.Fatalf("Error getting config: %v", err)
 	}
 
-	prettyJSON, err := json.MarshalIndent(config, "", "  ")
-	if err != nil {
-		log.Fatalf("Error formatting JSON: %v", err)
-	}
-
-	fmt.Printf("Configuration:\n%s\n", string(prettyJSON))
+	/*	client.Get(tggl.Context{
+		"abc": "1",
+	}, "mars", "avril")*/
 }
