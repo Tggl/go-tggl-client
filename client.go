@@ -80,52 +80,45 @@ func (c *Client) EvaluateContext(context Context) (FlagResponse, error) {
 }
 
 // GetBool returns the boolean value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetBool(key string, defaultValue bool) (bool, error) {
-	val, ok, err := get[bool](f, key)
+func (f FlagResponse) GetBool(slug string, defaultValue bool) bool {
+	val, ok := f.Get(slug, defaultValue).(bool)
 	if !ok {
-		return defaultValue, nil
+		return defaultValue
 	}
-	return val, err
+	return val
 }
 
 // GetString returns the string value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetString(key string, defaultValue string) (string, error) {
-	val, ok, err := get[string](f, key)
+func (f FlagResponse) GetString(slug string, defaultValue string) string {
+	val, ok := f.Get(slug, defaultValue).(string)
 	if !ok {
-		return defaultValue, nil
+		return defaultValue
 	}
-	return val, err
+	return val
 }
 
 // GetFloat64 returns the float64 value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetFloat64(key string, defaultValue float64) (float64, error) {
-	val, ok, err := get[float64](f, key)
+func (f FlagResponse) GetFloat64(slug string, defaultValue float64) float64 {
+	val, ok := f.Get(slug, defaultValue).(float64)
 	if !ok {
-		return defaultValue, nil
+		return defaultValue
 	}
-	return val, err
+	return val
 }
 
 // GetInt returns the int value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetInt(key string, defaultValue int) (int, error) {
-	val, ok, err := get[int](f, key)
+func (f FlagResponse) GetInt(slug string, defaultValue int) int {
+	val, ok := f.Get(slug, defaultValue).(int)
 	if !ok {
-		return defaultValue, nil
+		return defaultValue
 	}
-	return val, err
+	return val
 }
 
-func get[T any](f FlagResponse, key string) (T, bool, error) {
-	var result T
-	val, ok := f[key]
+func (f FlagResponse) Get(slug string, defaultValue any) any {
+	val, ok := f[slug]
 	if !ok {
-		return result, false, nil
+		return defaultValue
 	}
-
-	typeVal, ok := val.(T)
-	if !ok {
-		return result, true, fmt.Errorf("la valeur pour la clé %s n'est pas du type %T", key, typeVal)
-	}
-
-	return typeVal, true, nil
+	return val
 }

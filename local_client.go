@@ -53,6 +53,27 @@ type LocalClient struct {
 	stopPolling     chan struct{} // Channel to stop polling
 }
 
+// NewLocalClient creates a new instance of the client for configuration management
+func NewLocalClient(serverAPIKey string, httpClt HTTPClient, opts ...LocalClientOption) *LocalClient {
+	client := &LocalClient{
+		baseURL:      "https://api.tggl.io",
+		serverAPIKey: serverAPIKey,
+		httpClient:   httpClt,
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	// Start background polling
+	if client.pollingInterval > 0 {
+		_ = client.StartPolling() // Ignore error as it can't happen here
+	}
+
+	return client
+}
+
 // LocalClientOption represents an option for configuring the LocalClient
 type LocalClientOption func(*LocalClient)
 
@@ -104,27 +125,6 @@ func (c *LocalClient) StopPolling() {
 		close(c.stopPolling)
 		c.stopPolling = nil
 	}
-}
-
-// NewLocalClient creates a new instance of the client for configuration management
-func NewLocalClient(serverAPIKey string, httpClt HTTPClient, opts ...LocalClientOption) *LocalClient {
-	client := &LocalClient{
-		baseURL:      "https://api.tggl.io",
-		serverAPIKey: serverAPIKey,
-		httpClient:   httpClt,
-	}
-
-	// Apply options
-	for _, opt := range opts {
-		opt(client)
-	}
-
-	// Start background polling
-	if client.pollingInterval > 0 {
-		_ = client.StartPolling() // Ignore error as it can't happen here
-	}
-
-	return client
 }
 
 // GetConfig retrieves the configuration from the API
