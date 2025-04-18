@@ -70,17 +70,17 @@ func (c *Client) EvaluateContexts(contexts []Context) ([]FlagResponse, error) {
 }
 
 // EvaluateContext evaluates flags for a single context
-func (c *Client) EvaluateContext(context Context) (FlagResponse, error) {
+func (c *Client) EvaluateContext(context Context) (*FlagResponse, error) {
 	contexts := []Context{context}
 	flags, err := c.EvaluateContexts(contexts)
 	if err != nil {
-		return FlagResponse{}, err
+		return &FlagResponse{}, err
 	}
-	return flags[0], nil
+	return &flags[0], nil
 }
 
 // GetBool returns the boolean value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetBool(slug string, defaultValue bool) bool {
+func (f *FlagResponse) GetBool(slug string, defaultValue bool) bool {
 	val, ok := f.Get(slug, defaultValue).(bool)
 	if !ok {
 		return defaultValue
@@ -89,7 +89,7 @@ func (f FlagResponse) GetBool(slug string, defaultValue bool) bool {
 }
 
 // GetString returns the string value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetString(slug string, defaultValue string) string {
+func (f *FlagResponse) GetString(slug string, defaultValue string) string {
 	val, ok := f.Get(slug, defaultValue).(string)
 	if !ok {
 		return defaultValue
@@ -98,7 +98,7 @@ func (f FlagResponse) GetString(slug string, defaultValue string) string {
 }
 
 // GetFloat64 returns the float64 value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetFloat64(slug string, defaultValue float64) float64 {
+func (f *FlagResponse) GetFloat64(slug string, defaultValue float64) float64 {
 	val, ok := f.Get(slug, defaultValue).(float64)
 	if !ok {
 		return defaultValue
@@ -107,7 +107,7 @@ func (f FlagResponse) GetFloat64(slug string, defaultValue float64) float64 {
 }
 
 // GetInt returns the int value for the given key or the default value if the key doesn't exist
-func (f FlagResponse) GetInt(slug string, defaultValue int) int {
+func (f *FlagResponse) GetInt(slug string, defaultValue int) int {
 	val, ok := f.Get(slug, defaultValue).(int)
 	if !ok {
 		return defaultValue
@@ -115,8 +115,8 @@ func (f FlagResponse) GetInt(slug string, defaultValue int) int {
 	return val
 }
 
-func (f FlagResponse) Get(slug string, defaultValue any) any {
-	val, ok := f[slug]
+func (f *FlagResponse) Get(slug string, defaultValue any) any {
+	val, ok := (*f)[slug]
 	if !ok {
 		return defaultValue
 	}

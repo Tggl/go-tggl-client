@@ -9,19 +9,19 @@ import (
 	"time"
 )
 
-// MockHTTPClient implements the HTTPClient interface for testing
-type MockHTTPClient struct {
+// MockConfig implements the HTTPClient interface for testing
+type MockConfig struct {
 	DoFunc func(req *http.Request) (*http.Response, error)
 }
 
-func (m *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+func (m *MockConfig) Do(req *http.Request) (*http.Response, error) {
 	return m.DoFunc(req)
 }
 
 func TestGetConfig(t *testing.T) {
 	// Test the nominal case - valid response with flags
 	t.Run("successful config retrieval", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				if req.Header.Get("X-Tggl-Api-Key") != "test-key" {
 					t.Error("API key header not set correctly")
@@ -48,7 +48,7 @@ func TestGetConfig(t *testing.T) {
 	})
 
 	t.Run("unauthorized error", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusUnauthorized,
@@ -132,7 +132,7 @@ func TestPolling(t *testing.T) {
 		// Create a channel to track API calls
 		calls := make(chan time.Time, 10)
 
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				// Record the time of each call
 				calls <- time.Now()
@@ -183,7 +183,7 @@ func TestPolling(t *testing.T) {
 	})
 
 	t.Run("StartPolling with invalid interval returns error", func(t *testing.T) {
-		client := NewLocalClient("test-key", &MockHTTPClient{})
+		client := NewLocalClient("test-key", &MockConfig{})
 		client.pollingInterval = 0
 
 		err := client.StartPolling()
@@ -194,7 +194,7 @@ func TestPolling(t *testing.T) {
 
 	t.Run("StartPolling when already polling does nothing", func(t *testing.T) {
 		calls := 0
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				calls++
 				return &http.Response{

@@ -10,7 +10,7 @@ import (
 
 func TestEvaluateContexts(t *testing.T) {
 	t.Run("successful contexts evaluation", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				// Vérifie les headers essentiels
 				if req.Header.Get("X-Tggl-Api-Key") != "test-key" {
@@ -51,7 +51,7 @@ func TestEvaluateContexts(t *testing.T) {
 	})
 
 	t.Run("unauthorized error", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusUnauthorized,
@@ -69,7 +69,7 @@ func TestEvaluateContexts(t *testing.T) {
 	})
 
 	t.Run("server error with message", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusBadRequest,
@@ -87,7 +87,7 @@ func TestEvaluateContexts(t *testing.T) {
 	})
 
 	t.Run("server error without message", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusInternalServerError,
@@ -109,7 +109,7 @@ func TestEvaluateContext(t *testing.T) {
 	// Un seul test car EvaluateContext est un wrapper autour de EvaluateContexts
 	// Les cas d'erreur sont déjà couverts par les tests de EvaluateContexts
 	t.Run("evaluates single context", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				response := `[{"flag1":42}]`
 				return &http.Response{
@@ -125,13 +125,13 @@ func TestEvaluateContext(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
-		if flags["flag1"] != float64(42) {
+		if (*flags)["flag1"] != float64(42) {
 			t.Errorf("Expected flag1 to be 42")
 		}
 	})
 
 	t.Run("unauthorized error", func(t *testing.T) {
-		mockClient := &MockHTTPClient{
+		mockClient := &MockConfig{
 			DoFunc: func(req *http.Request) (*http.Response, error) {
 				return &http.Response{
 					StatusCode: http.StatusUnauthorized,

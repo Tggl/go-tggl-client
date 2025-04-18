@@ -9,8 +9,8 @@ import (
 //go:embed standard_tests.json
 var standardTests []byte
 
-// TestCase represents the structure of a test case from the JSON file
-type TestCase struct {
+// EvalTestCase represents the structure of a test case from the JSON file
+type EvalTestCase struct {
 	Name     string                 `json:"name"`
 	Flag     Flag                   `json:"flag"`
 	Context  map[string]interface{} `json:"context"`
@@ -22,7 +22,7 @@ type TestCase struct {
 
 func TestEvalFlag(t *testing.T) {
 	// Decode test cases
-	var testCases []TestCase
+	var testCases []EvalTestCase
 	if err := json.Unmarshal(standardTests, &testCases); err != nil {
 		t.Fatalf("Error decoding JSON: %v", err)
 	}
