@@ -4,9 +4,11 @@ import (
 	"bytes"
 	_ "embed"
 	"encoding/json"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"testing"
+	"time"
 )
 
 //go:embed reporting_tests.json
@@ -20,6 +22,12 @@ func (m *MockReporting) Do(req *http.Request) (*http.Response, error) {
 	return m.DoFunc(req)
 }
 
+type FakeClock struct {
+	fixedTime time.Time
+}
+
+func (f FakeClock) Now() time.Time { return f.fixedTime }
+
 type ReportingTestCase struct {
 	Name      string `json:"name"`
 	App       string `json:"app"`
@@ -31,7 +39,7 @@ type ReportingTestCase struct {
 		Context      Context     `json:"context"`
 		Slug         string      `json:"slug"`
 	}
-	Result interface{} `json:"result"`
+	Expected *Report `json:"result"`
 }
 
 func TestReporting(t *testing.T) {
@@ -41,15 +49,34 @@ func TestReporting(t *testing.T) {
 		t.Fatalf("Error decoding JSON: %v", err)
 	}
 
+	timestampMs := int64(123456789000) // en millisecondes
+	sec := timestampMs / 1000
+	nsec := (timestampMs % 1000) * int64(time.Millisecond)
+
+	fixedTime := time.Unix(sec, nsec)
+
+	fakeClock := &FakeClock{
+		fixedTime: fixedTime,
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.Name, func(t *testing.T) {
 			callsCount := 0
 			mockClient := &MockReporting{
 				DoFunc: func(req *http.Request) (*http.Response, error) {
 					callsCount++
-					if req.Header.Get("X-Tggl-Api-Key") != "API_KEY" {
-						t.Errorf("Expected X-Tggl-Api-Key header to be %q, got %q", "API_KEY", req.Header.Get("X-Tggl-Api-Key"))
+					require.Equal(t, "API_KEY", req.Header.Get("X-Tggl-Api-Key"))
+					require.Equal(t, "api.tggl.io", req.URL.Host)
+					require.Equal(t, "/report", req.URL.Path)
+					require.Equal(t, "POST", req.Method)
+
+					var body *Report
+					if req.Body != http.NoBody {
+						err := json.NewDecoder(req.Body).Decode(&body)
+						require.NoError(t, err)
 					}
+
+					require.Equal(t, tc.Expected, body)
 
 					return &http.Response{
 						StatusCode: http.StatusOK,
@@ -58,30 +85,31 @@ func TestReporting(t *testing.T) {
 				},
 			}
 
-			reporting := NewReporting("API_KEY", tc.App, tc.AppPrefix, mockClient)
-
-			if callsCount != 1 {
-				t.Errorf("Expected 1 call, got %d", callsCount)
-			}
+			reporting := NewReporting("API_KEY", tc.App, tc.AppPrefix, mockClient, fakeClock)
 
 			for _, call := range tc.Calls {
 				if call.Type == "flag" {
-					if err := reporting.ReportFlag(call.Slug, &FlagValue{
+					err := reporting.ReportFlag(call.Slug, &FlagValue{
 						Default: call.DefaultValue,
 						Value:   call.Value,
-					}); err != nil {
-						t.Errorf("Error reporting flag: %v", err)
-					}
+					})
+					require.NoError(t, err)
 					continue
 				}
 
 				if call.Type == "context" {
-					if err := reporting.ReportContext(call.Slug, &call.Context); err != nil {
-						t.Errorf("Error reporting context: %v", err)
-					}
+					err := reporting.ReportContext(call.Slug, &call.Context)
+					require.NoError(t, err)
 					continue
 				}
 				t.Errorf("Unexpected call type: %v", call.Type)
+			}
+
+			err := reporting.SendReport()
+			require.NoError(t, err)
+
+			if callsCount != 1 {
+				t.Errorf("Expected 1 call, got %d", callsCount)
 			}
 		})
 	}
